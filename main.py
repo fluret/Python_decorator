@@ -38,16 +38,30 @@ def display_folder_menu(folders):
 
 
 def display_file_menu(folder_name, files):
-    """Affiche le menu des fichiers dans un dossier."""
-    print("\n" + "="*50)
+    """Affiche le menu des fichiers dans un dossier sur 4 colonnes alignées."""
+    print("\n" + "="*110)
     print(f"DOSSIER: {folder_name}")
-    print("="*50)
-    print("\n[0] ← Retour aux dossiers\n")
+    print("="*110)
+    print("[000] ← Retour aux dossiers\n")
     
-    for idx, file in enumerate(files, 1):
-        print(f"[{idx}] {file.name}")
+    # Afficher les fichiers sur 4 colonnes avec alignement
+    col_width = 35  # Largeur totale de chaque colonne
+    num_cols = 4
     
-    print("="*50)
+    for idx in range(0, len(files), num_cols):
+        row = []
+        for j in range(num_cols):
+            if idx + j < len(files):
+                file_num = idx + j + 1
+                file_name = files[idx + j].name
+                # Format : [001] filename avec largeur fixe
+                entry = f"[{file_num:03d}] {file_name}"
+                row.append(entry.ljust(col_width))
+            else:
+                row.append("")
+        print("".join(row))
+    
+    print("="*110)
 
 
 def run_app(file_path):
