@@ -1,0 +1,272 @@
+\documentclass[12pt,a4paper]{article}
+\usepackage[utf-8]{inputenc}
+\usepackage[french]{babel}
+\usepackage{listings}
+\usepackage{xcolor}
+\usepackage{geometry}
+\usepackage{hyperref}
+
+\geometry{margin=1in}
+
+% Configuration des listings pour le code Python
+\lstset{
+    language=Python,
+    basicstyle=\ttfamily\small,
+    keywordstyle=\color{blue},
+    commentstyle=\color{gray},
+    stringstyle=\color{red},
+    breaklines=true,
+    showspaces=false,
+    showstringspaces=false,
+    frame=single,
+    rulecolor=\color{black},
+    backgroundcolor=\color{white}
+}
+
+\title{Explication détaillée du décorateur \texttt{make\_html}}
+\author{}
+\date{}
+
+\begin{document}
+
+\maketitle
+
+\section*{Vue d'ensemble}
+
+Ce code implémente une \textbf{fabrique de décorateurs} qui enveloppe le résultat d'une fonction dans des balises HTML. C'est un exemple de \textbf{décorateur paramétré} en Python.
+
+\section*{Structure générale : 3 niveaux d'imbrication}
+
+\begin{lstlisting}
+make_html(tag, **attrs)           # Niveau 1 : Fabrique
+    └─ decorator(func)             # Niveau 2 : Décorateur
+        └─ wrapper(*args, **kwargs) # Niveau 3 : Wrapper
+\end{lstlisting}
+
+\subsection*{Pourquoi 3 niveaux ?}
+
+\begin{itemize}
+    \item Le décorateur est \textbf{paramétré} : il reçoit \texttt{tag} (la balise HTML) et \texttt{**attrs} (les attributs HTML).
+    \item Avec des paramètres, il faut une fabrique (niveau 1) pour capturer ces valeurs avant de retourner le décorateur réel.
+\end{itemize}
+
+\section*{Niveau 1 : La fabrique \texttt{make\_html(tag, **attrs)}}
+
+\begin{lstlisting}
+def make_html(tag, **attrs):
+\end{lstlisting}
+
+\subsection*{Rôle}
+
+Accepter les paramètres du décorateur.
+
+\subsection*{Paramètres}
+
+\begin{itemize}
+    \item \texttt{tag} : une chaîne représentant la balise HTML (ex: \texttt{'p'}, \texttt{'strong'}, \texttt{'div'})
+    \item \texttt{**attrs} : arguments nommés arbitraires représentant les attributs HTML (ex: \texttt{class\_='bold'}, \texttt{id='main-text'})
+\end{itemize}
+
+\subsection*{Exemple d'appel}
+
+\begin{lstlisting}
+make_html('p')  # tag='p', attrs={}
+make_html('strong', class_='bold', id='main-text')  
+# tag='strong', attrs={'class_': 'bold', 'id': 'main-text'}
+\end{lstlisting}
+
+Ces valeurs sont \textbf{capturées} dans la fermeture (closure) des fonctions internes.
+
+\section*{Niveau 2 : Le décorateur \texttt{decorator(func)}}
+
+\begin{lstlisting}
+def decorator(func):
+\end{lstlisting}
+
+\subsection*{Rôle}
+
+Être le véritable décorateur que Python applique à la fonction.
+
+\subsection*{Paramètre}
+
+\begin{itemize}
+    \item \texttt{func} : la fonction décorée (passée automatiquement par Python lors du décorateur)
+\end{itemize}
+
+\subsection*{Exemple}
+
+\begin{lstlisting}
+@make_html('strong', class_='bold', id='main-text')
+def get_text(text='I code with PyBites'):
+    return text
+
+# Python appelle : decorator(get_text)
+\end{lstlisting}
+
+À l'intérieur, on définit le wrapper et on le retourne avec \texttt{@wraps(func)}.
+
+\subsection*{\texttt{@wraps(func)} : Préserver les métadonnées}
+
+\begin{lstlisting}
+@wraps(func)
+def wrapper(*args, **kwargs):
+\end{lstlisting}
+
+\texttt{@wraps(func)} copie les métadonnées de \texttt{func} au \texttt{wrapper} :
+
+\begin{itemize}
+    \item \texttt{wrapper.__name__} = \texttt{func.__name__}
+    \item \texttt{wrapper.__doc__} = \texttt{func.__doc__}
+    \item Autres attributs importants
+\end{itemize}
+
+\textbf{Sans \texttt{@wraps}} : on perdrait le nom et la doc de la fonction décorée. Essentiel pour la maintenabilité.
+
+\section*{Niveau 3 : Le wrapper \texttt{wrapper(*args, **kwargs)}}
+
+\begin{lstlisting}
+def wrapper(*args, **kwargs):
+\end{lstlisting}
+
+\subsection*{Rôle}
+
+C'est la fonction qui s'exécute \textbf{à chaque appel} de la fonction décorée.
+
+\subsection*{Étape 1 : Nettoyer les attributs}
+
+\begin{lstlisting}
+clean_attrs = {key.rstrip('_'): value for key, value in attrs.items()}
+\end{lstlisting}
+
+\textbf{Pourquoi ?} En Python, \texttt{class}, \texttt{for}, \texttt{if} sont des mots-clés réservés. On ne peut pas passer \texttt{class='bold'} directement.
+
+\textbf{Solution} : On passe \texttt{class\_='bold'} (avec un tiret bas). Cette ligne supprime le tiret bas final.
+
+\textbf{Exemple} :
+
+\begin{lstlisting}
+attrs = {'class_': 'bold', 'id': 'main-text'}
+clean_attrs = {'class': 'bold', 'id': 'main-text'}
+\end{lstlisting}
+
+\subsection*{Étape 2 : Construire la chaîne d'attributs HTML}
+
+\begin{lstlisting}
+attributes = " ".join(f'{key}="{value}"' for key, value 
+                      in clean_attrs.items())
+\end{lstlisting}
+
+Crée une chaîne des attributs au format HTML.
+
+\textbf{Exemple} :
+
+\begin{lstlisting}
+clean_attrs = {'class': 'bold', 'id': 'main-text'}
+attributes = 'class="bold" id="main-text"'
+\end{lstlisting}
+
+\textbf{Comment ça marche} :
+
+\begin{enumerate}
+    \item Boucle sur chaque paire clé-valeur
+    \item Formate comme \texttt{key="value"}
+    \item Jointure avec des espaces
+\end{enumerate}
+
+\subsection*{Étape 3 : Ajouter un espace si des attributs existent}
+
+\begin{lstlisting}
+attr_str = f" {attributes}" if attributes else ""
+\end{lstlisting}
+
+Si des attributs existent, on ajoute un espace devant pour séparer la balise des attributs.
+
+\textbf{Exemples} :
+
+\begin{lstlisting}
+# Avec attributs
+attr_str = " class=\"bold\" id=\"main-text\""
+
+# Sans attributs
+attr_str = ""
+\end{lstlisting}
+
+\subsection*{Étape 4 : Envelopper le résultat dans la balise HTML}
+
+\begin{lstlisting}
+return f"<{tag}{attr_str}>{func(*args, **kwargs)}</{tag}>"
+\end{lstlisting}
+
+Exécute la fonction décorée, enveloppe son résultat dans les balises HTML.
+
+\textbf{Flux complet} :
+
+\begin{enumerate}
+    \item \texttt{func(*args, **kwargs)} exécute la fonction décorée et récupère son résultat
+    \item Construit la balise ouvrante : \texttt{<\{tag\}\{attr\_str\}>} ex: \texttt{<strong class="bold" id="main-text">}
+    \item Insère le résultat de la fonction
+    \item Ajoute la balise fermante : \texttt{</\{tag\}>} ex: \texttt{</strong>}
+\end{enumerate}
+
+\textbf{Exemple concret} :
+
+\begin{lstlisting}
+func() retourne : "I code with PyBites"
+tag = "strong"
+attr_str = " class=\"bold\" id=\"main-text\""
+
+Résultat final : 
+'<strong class="bold" id="main-text">I code with PyBites</strong>'
+\end{lstlisting}
+
+\section*{Exemple d'exécution complète}
+
+\begin{lstlisting}
+@make_html('p')
+@make_html('strong', class_='bold', id='main-text')
+def get_text(text='I code with PyBites'):
+    return text
+\end{lstlisting}
+
+\subsection*{Déroulement}
+
+\begin{enumerate}
+    \item \textbf{Appel} : \texttt{get\_text()}
+
+    \item \textbf{Premier wrapper} (le plus interne, \texttt{strong}) :
+    \begin{itemize}
+        \item Exécute \texttt{get\_text()} $\rightarrow$ \texttt{"I code with PyBites"}
+        \item Enveloppe avec \texttt{<strong class="bold" id="main-text">...</strong>}
+        \item Retourne : \texttt{'<strong class="bold" id="main-text">I code with PyBites</strong>'}
+    \end{itemize}
+
+    \item \textbf{Deuxième wrapper} (\texttt{p}) :
+    \begin{itemize}
+        \item Exécute le résultat du wrapper précédent
+        \item Enveloppe avec \texttt{<p>...</p>}
+        \item Retourne : \texttt{'<p><strong class="bold" id="main-text">I code with PyBites</strong></p>'}
+    \end{itemize}
+
+    \item \textbf{Résultat final} : \texttt{'<p><strong class="bold" id="main-text">I code with PyBites</strong></p>'}
+\end{enumerate}
+
+\section*{Avantages de cette approche}
+
+\begin{itemize}
+    \item[\checkmark] \textbf{Réutilisabilité} : On peut l'appliquer à plusieurs fonctions
+    \item[\checkmark] \textbf{Flexibilité} : Changer la balise ou les attributs sans modifier la fonction
+    \item[\checkmark] \textbf{Composition} : Plusieurs décorateurs imbriqués pour combiner des balises
+    \item[\checkmark] \textbf{Séparation} : La logique HTML est séparée de la logique métier
+\end{itemize}
+
+\section*{Résumé}
+
+Ce décorateur paramétré utilise 3 niveaux :
+
+\begin{itemize}
+    \item \textbf{Fabrique} : capture les paramètres (\texttt{tag}, \texttt{attrs})
+    \item \textbf{Décorateur} : s'applique à la fonction
+    \item \textbf{Wrapper} : enveloppe le résultat dans du HTML à chaque exécution
+\end{itemize}
+
+\end{document}
